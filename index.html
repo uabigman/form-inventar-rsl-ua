@@ -1,11 +1,15 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="uk">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Загрузка изображения</title>
+  <title>Завантаження зображення</title>
   <style>
+
+    /* Сброс стандартных отступов браузера для всех элементов */
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* Основной фон страницы — центрируем карточку по вертикали и горизонтали */
     body {
       font-family: system-ui, sans-serif;
       min-height: 100vh;
@@ -14,6 +18,8 @@
       justify-content: center;
       background: #f0f2f5;
     }
+
+    /* Белая карточка по центру страницы */
     .card {
       background: white;
       border-radius: 12px;
@@ -22,8 +28,11 @@
       max-width: 440px;
       box-shadow: 0 4px 24px rgba(0,0,0,0.1);
     }
+
     h2 { margin-bottom: 24px; color: #1a1a2e; }
 
+    /* Зона drag-and-drop и выбора файла.
+       position: relative нужен, чтобы скрытый <input> перекрывал всю зону */
     .drop-zone {
       border: 2px dashed #ccc;
       border-radius: 8px;
@@ -33,185 +42,315 @@
       transition: border-color 0.2s, background 0.2s;
       position: relative;
     }
+
+    /* Подсветка зоны при наведении или перетаскивании файла */
     .drop-zone:hover, .drop-zone.dragover {
       border-color: #6366f1;
       background: #f5f3ff;
     }
+
+    /* Скрытый input[type=file] растянут на всю зону drop-zone.
+       Клик в любом месте зоны откроет диалог выбора файла */
     .drop-zone input[type="file"] {
-      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
     }
+
     .drop-zone p { color: #666; font-size: 14px; pointer-events: none; }
     .drop-zone .icon { font-size: 36px; margin-bottom: 8px; }
 
+    /* Блок предпросмотра выбранного изображения — скрыт по умолчанию,
+       показывается через JS после выбора файла */
     .preview-wrap { margin-top: 16px; display: none; }
     .preview-wrap img {
-      width: 100%; border-radius: 8px; max-height: 240px;
-      object-fit: cover; border: 1px solid #e5e7eb;
+      width: 100%;
+      border-radius: 8px;
+      max-height: 240px;
+      object-fit: cover;
+      border: 1px solid #e5e7eb;
     }
 
+    /* Разделитель "або" между зоной файла и кнопкой камеры */
     .divider {
-      display: flex; align-items: center; gap: 12px;
-      margin: 20px 0; color: #aaa; font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0;
+      color: #aaa;
+      font-size: 13px;
     }
+    /* Горизонтальные линии по бокам текста "або" */
     .divider::before, .divider::after {
-      content: ''; flex: 1; height: 1px; background: #e5e7eb;
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #e5e7eb;
     }
 
+    /* Секция с камерой */
     .camera-section { text-align: center; }
-    video { width: 100%; border-radius: 8px; display: none; background: #000; }
+
+    /* Элемент <video> показывает поток с камеры.
+       Скрыт по умолчанию, показывается при открытии камеры */
+    video {
+      width: 100%;
+      border-radius: 8px;
+      display: none;
+      background: #000;
+    }
+
+    /* Canvas используется только для "захвата" кадра с видео.
+       Пользователь его не видит — он всегда скрыт */
     canvas { display: none; }
 
+    /* Общие стили для всех кнопок */
     button {
-      width: 100%; padding: 12px;
-      border: none; border-radius: 8px;
-      font-size: 15px; cursor: pointer;
-      font-weight: 600; transition: opacity 0.2s;
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: opacity 0.2s;
     }
     button:hover { opacity: 0.85; }
+
+    /* Кнопка "Відкрити камеру" — серая, всегда видна */
     .btn-camera {
-      background: #f3f4f6; color: #374151;
+      background: #f3f4f6;
+      color: #374151;
       margin-bottom: 10px;
     }
-    .btn-capture { background: #ef4444; color: white; display: none; margin-bottom: 10px; }
+
+    /* Кнопка "Зробити знімок" — красная, появляется только когда камера открыта */
+    .btn-capture {
+      background: #ef4444;
+      color: white;
+      display: none;
+      margin-bottom: 10px;
+    }
+
+    /* Кнопка отправки формы — фиолетовая */
     .btn-submit { background: #6366f1; color: white; margin-top: 20px; }
 
+    /* Блок статуса (успех / ошибка / загрузка).
+       Показывается через JS, меняет класс и цвет фона */
     .status {
-      margin-top: 16px; padding: 12px; border-radius: 8px;
-      font-size: 14px; display: none; text-align: center;
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      display: none;
+      text-align: center;
     }
     .status.success { background: #d1fae5; color: #065f46; display: block; }
     .status.error   { background: #fee2e2; color: #991b1b; display: block; }
     .status.loading { background: #e0e7ff; color: #3730a3; display: block; }
+
   </style>
 </head>
 <body>
 <div class="card">
-  <h2>📷 Завантажуйте зображення</h2>
+  <h2>📷 Завантажити зображення</h2>
 
-  <!-- Drag & drop / file pick -->
+  <!-- ===== ЗОНА ВЫБОРА ФАЙЛА ===== -->
+  <!-- Вся зона кликабельна благодаря скрытому input, растянутому поверх -->
   <div class="drop-zone" id="dropZone">
     <div class="icon">🖼️</div>
-    <p>Перетащите файл сюда<br>или нажмите для выбора</p>
+    <p>Перетягніть файл сюди<br>або натисніть для вибору</p>
+    <!-- accept="image/*" ограничивает выбор только файлами изображений -->
     <input type="file" id="fileInput" accept="image/*">
   </div>
+
+  <!-- Предпросмотр — появляется после выбора файла или снимка с камеры -->
   <div class="preview-wrap" id="previewWrap">
-    <img id="preview" src="" alt="Предпросмотр">
+    <img id="preview" src="" alt="Попередній перегляд">
   </div>
 
-  <div class="divider">или</div>
+  <!-- Разделитель -->
+  <div class="divider">або</div>
 
-  <!-- Camera -->
+  <!-- ===== СЕКЦИЯ КАМЕРЫ ===== -->
   <div class="camera-section">
+    <!-- Видеопоток с камеры отображается здесь -->
     <video id="video" autoplay playsinline></video>
+    <!-- Скрытый canvas — только для захвата кадра через JS -->
     <canvas id="canvas"></canvas>
-    <button class="btn-camera" id="btnCamera">📸 Открыть камеру</button>
-    <button class="btn-capture" id="btnCapture">🔴 Сделать снимок</button>
+    <!-- Переключает камеру вкл/выкл -->
+    <button class="btn-camera" id="btnCamera">📸 Відкрити камеру</button>
+    <!-- Появляется только когда камера активна -->
+    <button class="btn-capture" id="btnCapture">🔴 Зробити знімок</button>
   </div>
 
-  <button class="btn-submit" id="btnSubmit">Отправить</button>
+  <!-- ===== КНОПКА ОТПРАВКИ ===== -->
+  <button class="btn-submit" id="btnSubmit">Надіслати</button>
+
+  <!-- Сообщение о статусе отправки (скрыто до нажатия кнопки) -->
   <div class="status" id="status"></div>
 </div>
 
 <script>
-  // ⚠️ Замените на ваш реальный URL вебхука из n8n
+
+  // ⚠️ ВАЖНО: замените на реальный URL вашего вебхука из n8n
   const WEBHOOK_URL = 'https://your-n8n-instance.com/webhook/abc123';
 
+  // Переменная для хранения выбранного файла (из диалога или с камеры)
   let selectedFile = null;
+
+  // Переменная для хранения потока с камеры
   let stream = null;
 
-  const fileInput  = document.getElementById('fileInput');
-  const dropZone   = document.getElementById('dropZone');
-  const previewWrap= document.getElementById('previewWrap');
-  const preview    = document.getElementById('preview');
-  const video      = document.getElementById('video');
-  const canvas     = document.getElementById('canvas');
-  const btnCamera  = document.getElementById('btnCamera');
-  const btnCapture = document.getElementById('btnCapture');
-  const btnSubmit  = document.getElementById('btnSubmit');
-  const status     = document.getElementById('status');
+  // ===== ПОЛУЧАЕМ ССЫЛКИ НА HTML-ЭЛЕМЕНТЫ =====
+  const fileInput   = document.getElementById('fileInput');
+  const dropZone    = document.getElementById('dropZone');
+  const previewWrap = document.getElementById('previewWrap');
+  const preview     = document.getElementById('preview');
+  const video       = document.getElementById('video');
+  const canvas      = document.getElementById('canvas');
+  const btnCamera   = document.getElementById('btnCamera');
+  const btnCapture  = document.getElementById('btnCapture');
+  const btnSubmit   = document.getElementById('btnSubmit');
+  const status      = document.getElementById('status');
 
-  // --- File input ---
+
+  // ===== ВЫБОР ФАЙЛА ЧЕРЕЗ ДИАЛОГ =====
   fileInput.addEventListener('change', e => {
     if (e.target.files[0]) setFile(e.target.files[0]);
   });
 
-  // --- Drag & drop ---
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
-  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+
+  // ===== DRAG AND DROP =====
+
+  // Когда файл перетаскивают над зоной — подсвечиваем её
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+  });
+
+  // Когда файл уносят обратно — убираем подсветку
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('dragover');
+  });
+
+  // Когда файл бросают в зону — берём первый файл из списка
   dropZone.addEventListener('drop', e => {
     e.preventDefault();
     dropZone.classList.remove('dragover');
     const f = e.dataTransfer.files[0];
+    // Принимаем только файлы-изображения
     if (f && f.type.startsWith('image/')) setFile(f);
   });
 
+
+  // ===== УСТАНОВКА ФАЙЛА И ПРЕДПРОСМОТР =====
   function setFile(file) {
     selectedFile = file;
+    // Создаём временный URL для показа картинки без загрузки на сервер
     const url = URL.createObjectURL(file);
     preview.src = url;
     previewWrap.style.display = 'block';
     stopCamera();
   }
 
-  // --- Camera ---
+
+  // ===== УПРАВЛЕНИЕ КАМЕРОЙ =====
+
   btnCamera.addEventListener('click', async () => {
+    // Если камера уже открыта — закрываем её
     if (stream) { stopCamera(); return; }
+
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      // facingMode: 'environment' — задняя камера на телефоне
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
       video.srcObject = stream;
       video.style.display = 'block';
-      btnCamera.textContent = '❌ Закрыть камеру';
+      btnCamera.textContent = '❌ Закрити камеру';
       btnCapture.style.display = 'block';
     } catch {
-      showStatus('Не удалось получить доступ к камере', 'error');
+      // Пользователь отказал в доступе или камера недоступна
+      showStatus('Не вдалося отримати доступ до камери', 'error');
     }
   });
 
   btnCapture.addEventListener('click', () => {
+    // Устанавливаем размер canvas равным размеру видеокадра
     canvas.width  = video.videoWidth;
     canvas.height = video.videoHeight;
+    // "Рисуем" текущий кадр видео на canvas
     canvas.getContext('2d').drawImage(video, 0, 0);
+    // Конвертируем canvas в файл формата JPEG с качеством 92%
     canvas.toBlob(blob => {
       setFile(new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' }));
     }, 'image/jpeg', 0.92);
   });
 
+  // Останавливаем все треки камеры и скрываем видео
   function stopCamera() {
-    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-    video.style.display = 'none';
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+    video.style.display  = 'none';
     btnCapture.style.display = 'none';
-    btnCamera.textContent = '📸 Открыть камеру';
+    btnCamera.textContent = '📸 Відкрити камеру';
   }
 
-  // --- Submit ---
+
+  // ===== ОТПРАВКА ФАЙЛА НА СЕРВЕР =====
+
   btnSubmit.addEventListener('click', async () => {
+    // Проверяем — есть ли выбранный файл
     if (!selectedFile) {
-      showStatus('Выберите или сфотографируйте изображение', 'error'); return;
+      showStatus('Виберіть або сфотографуйте зображення', 'error');
+      return;
     }
-    showStatus('Отправка...', 'loading');
+
+    showStatus('Надсилання...', 'loading');
+
+    // FormData — специальный объект для отправки файлов через HTTP
     const form = new FormData();
+    // 'image' — имя поля, по которому n8n найдёт файл
     form.append('image', selectedFile, selectedFile.name);
 
     try {
-      const res = await fetch(WEBHOOK_URL, { method: 'POST', body: form });
+      const res = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        body: form
+        // Content-Type не указываем — браузер сам поставит multipart/form-data
+      });
+
       if (res.ok) {
-        showStatus('✅ Изображение успешно отправлено!', 'success');
+        showStatus('✅ Зображення успішно надіслано!', 'success');
+        // Сбрасываем форму в исходное состояние
         selectedFile = null;
         preview.src = '';
         previewWrap.style.display = 'none';
         fileInput.value = '';
       } else {
-        showStatus(`Ошибка сервера: ${res.status}`, 'error');
+        showStatus(`Помилка сервера: ${res.status}`, 'error');
       }
+
     } catch {
-      showStatus('Ошибка соединения с сервером', 'error');
+      // Нет соединения или вебхук недоступен
+      showStatus('Помилка з\'єднання з сервером', 'error');
     }
   });
 
+
+  // ===== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ =====
+  // type: 'success' | 'error' | 'loading'
   function showStatus(msg, type) {
     status.textContent = msg;
     status.className = `status ${type}`;
   }
+
 </script>
 </body>
 </html>
